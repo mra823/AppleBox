@@ -1,0 +1,29 @@
+# Third-Party Code Audit
+
+AppleBox is MIT-licensed. Every piece of vendored or linked third-party code is
+recorded here with its origin and license. **Only permissive licenses (MIT,
+BSD-2/3-Clause, Zlib, public domain) may be vendored.** GPL projects (AppleWin,
+LisaEm, DingusPPC, Basilisk II, PearPC, QEMU, KEGS/GSplus) are documentation /
+behavioral references only — their code must never be copied into this tree.
+
+| Component | Path | Origin | License | Copyright |
+|-----------|------|--------|---------|-----------|
+| Dear ImGui (docking) | `thirdparty/imgui/` (submodule) | github.com/ocornut/imgui | MIT | Omar Cornut |
+| SDL2 | system library (linked) | libsdl.org | Zlib | Sam Lantinga et al. |
+| SHA-256 | `src/core/sha256.cpp` | original implementation for AppleBox (from the FIPS 180-4 public specification) | MIT (project) | AppleBox contributors |
+
+## Planned (future phases — audit before vendoring)
+
+| Component | Purpose | License | Notes |
+|-----------|---------|---------|-------|
+| MAME m6502 / g65sc02 | 6502/65C02 cores (Phase 1–2) | BSD-3-Clause per file | Keep `// license:BSD-3-Clause` headers intact; never link whole MAME |
+| MAME g65816 | 65C816 core (Phase 4) | BSD-3-Clause per file | same |
+| Moira | 68000/010/020 core (Phase 3) | MIT | Dirk Hoffmann |
+| Musashi | 68030/040 + FPU (Phase 6) | MIT | Karl Stenerud |
+| MAME PowerPC | PPC 601/603/604/750 (Phase 7) | BSD-3-Clause per file | Aaron Giles |
+| Capstone | PPC disassembly (Phase 7–8) | BSD-3-Clause | |
+
+## ROMs
+
+Apple ROMs are copyrighted and are **never** committed or distributed. Users
+supply their own under `roms/`, validated against `roms/manifest` hashes.

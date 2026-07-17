@@ -1,0 +1,29 @@
+// AppleBox — main window: SDL2 + OpenGL3 + Dear ImGui shell.
+// SPDX-License-Identifier: MIT
+#pragma once
+
+#include <filesystem>
+
+#include "core/scheduler.h"
+#include "ui/machine_config_dialog.h"
+
+struct SDL_Window;
+
+namespace ab {
+
+class MainWindow {
+public:
+    // Returns process exit code. `headlessFrames` > 0 runs N frames without
+    // requiring user interaction (used by CI smoke tests).
+    int run(int headlessFrames = 0);
+
+private:
+    void drawUi();
+
+    Scheduler scheduler_;
+    MachineConfig machineConfig_;
+    MachineConfigDialog configDialog_{std::filesystem::path("roms")};
+    bool showDemo_ = false;
+};
+
+} // namespace ab

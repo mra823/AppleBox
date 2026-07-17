@@ -1,0 +1,7 @@
+build/
+roms/**
+!roms/README.md
+!roms/*.manifest
+.cache/
+compile_commands.json
+imgui.ini
