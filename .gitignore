@@ -2,6 +2,7 @@ build/
 roms/**
 !roms/README.md
 !roms/*.manifest
+tests/data/
 .cache/
 compile_commands.json
 imgui.ini

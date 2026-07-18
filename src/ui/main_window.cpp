@@ -49,9 +49,11 @@ int MainWindow::run(int headlessFrames) {
             if (event.type == SDL_QUIT) running = false;
         }
 
-        // Phase 0: the scheduler advances an empty timeline each frame to
-        // prove the master clock runs; machines drive it from Phase 1 on.
-        scheduler_.runUntil(scheduler_.now() + 1'000'000);
+        // Advance emulated time ~one display frame per host frame.
+        if (apple1_)
+            apple1_->run(Apple1Machine::kClockHz / 60);
+        else
+            scheduler_.runUntil(scheduler_.now() + 1'000'000);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -93,18 +95,88 @@ void MainWindow::drawUi() {
         ImGui::EndMainMenuBar();
     }
 
-    if (configDialog_.draw(machineConfig_)) {
-        // Machine instantiation begins in Phase 1.
-    }
+    if (configDialog_.draw(machineConfig_)) startMachine();
 
     ImGui::Begin("Status");
-    ImGui::Text("AppleBox 0.1.0 — Phase 0 skeleton");
-    ImGui::Text("Master clock: %lld ticks", static_cast<long long>(scheduler_.now()));
-    ImGui::Text("Machines in catalog: %zu (0 implemented)", machineCatalog().size());
-    ImGui::TextDisabled("Place ROMs under roms/<machine>/ to enable models.");
+    ImGui::Text("AppleBox 0.1.0 — Phase 1");
+    if (apple1_) {
+        ImGui::Text("Machine: Apple I @ 1.023 MHz");
+        ImGui::Text("Master clock: %lld ticks",
+                    static_cast<long long>(apple1_->scheduler().now()));
+    } else {
+        ImGui::Text("No machine running.");
+        ImGui::TextDisabled("Machine > Configure... to select one.");
+        ImGui::TextDisabled("Place ROMs under roms/<machine>/ to enable models.");
+    }
+    if (!machineError_.empty())
+        ImGui::TextColored(ImVec4(1.f, 0.4f, 0.4f, 1.f), "%s",
+                           machineError_.c_str());
     ImGui::End();
 
+    if (apple1_) drawTerminal();
+
     if (showDemo_) ImGui::ShowDemoWindow(&showDemo_);
+}
+
+void MainWindow::startMachine() {
+    machineError_.clear();
+    apple1_.reset();
+    terminal_.clear();
+    terminalCol_ = 0;
+    if (machineConfig_.machineId != "apple1") {
+        if (!machineConfig_.machineId.empty())
+            machineError_ = machineConfig_.machineId + ": not yet implemented";
+        return;
+    }
+    auto m = std::make_unique<Apple1Machine>();
+    if (!m->loadRoms("roms")) {
+        machineError_ = "apple1: roms/apple1/wozmon.rom missing or invalid";
+        return;
+    }
+    m->onDisplayChar = [this](char c) {
+        // 40-column display; CR is the only control character.
+        if (c == '\r') {
+            terminal_.push_back('\n');
+            terminalCol_ = 0;
+        } else if (c >= 0x20) {
+            terminal_.push_back(c);
+            if (++terminalCol_ >= 40) {
+                terminal_.push_back('\n');
+                terminalCol_ = 0;
+            }
+        }
+    };
+    m->reset();
+    apple1_ = std::move(m);
+}
+
+void MainWindow::drawTerminal() {
+    ImGui::SetNextWindowSize(ImVec2(480, 400), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Apple I Terminal");
+
+    ImGui::BeginChild("##term", ImVec2(0, 0), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+    ImGui::TextUnformatted(terminal_.c_str());
+    ImGui::PopStyleColor();
+    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1)
+        ImGui::SetScrollHereY(1.0f);
+
+    // Keyboard: route typed characters to the machine while hovered/focused.
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+        ImGuiIO& io = ImGui::GetIO();
+        for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
+            unsigned c = io.InputQueueCharacters[i];
+            if (c >= 0x20 && c < 0x7f)
+                apple1_->typeChar(static_cast<char>(c));
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+            ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
+            apple1_->typeChar('\r');
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) apple1_->typeChar(0x1b);
+    }
+    ImGui::EndChild();
+    ImGui::End();
 }
 
 } // namespace ab

@@ -23,7 +23,12 @@ const std::vector<MachineDesc>& machineCatalog() {
     // Phase 0: catalog only; nothing is selectable yet.
     static const std::vector<MachineDesc> catalog = {
         // --- 6502 (Phases 1–2) ---
-        {"apple1", "Apple I", CpuFamily::M6502, "apple1", {}, 0},
+        {"apple1",
+         "Apple I",
+         CpuFamily::M6502,
+         "apple1",
+         {{"wozmon.rom", 0x100, "", false}, {"basic.rom", 0x1000, "", true}},
+         1},
         {"apple2", "Apple II", CpuFamily::M6502, "apple2", {}, 0},
         {"apple2plus", "Apple II+", CpuFamily::M6502, "apple2plus", {}, 0},
         {"apple2e", "Apple IIe", CpuFamily::M6502, "apple2e", {}, 0},

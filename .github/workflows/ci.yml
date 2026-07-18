@@ -27,5 +27,12 @@ jobs:
         run: cmake --preset debug
       - name: Build
         run: cmake --build --preset debug
+      - name: Cache CPU test data
+        uses: actions/cache@v4
+        with:
+          path: tests/data
+          key: cpu-test-data-6502-v1
+      - name: Fetch CPU test data
+        run: ./scripts/fetch_test_data.sh
       - name: Test
         run: ctest --preset debug

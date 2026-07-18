@@ -33,6 +33,11 @@ public:
     // consumed (a core may overshoot to finish an instruction).
     virtual Ticks run(Ticks cycles) = 0;
 
+    // Abort the current run() slice at the next resumable point. Devices
+    // call this when a bus access schedules an event earlier than the
+    // slice's end, so the machine loop can recompute its slice bound.
+    virtual void abortSlice() {}
+
     // Interrupt lines.
     virtual void setIrq(int level, bool asserted) = 0;
     virtual void setNmi(bool asserted) = 0;

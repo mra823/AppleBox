@@ -107,9 +107,10 @@ Each selected model exposes 86Box-style tabs: **Machine** (model, CPU speed, FPU
 
 Hand this to the AI agent as `CLAUDE.md` phases. Each phase has acceptance criteria; do not advance until they are met. ("Unit" = one focused work-block; treat as relative ordering/complexity, not a calendar estimate.)
 
-**Phase 0 — Skeleton (1 unit).** CMake project, ImGui+SDL2 window, `ICpuCore`/`BusInterface`/`Device`/`Scheduler` abstractions, save-state visitor, ROM manifest loader, empty machine-config dialog, and a **per-file license audit of all vendored code.** *Accept:* window opens on Fedora; empty scheduler runs; CI green; license audit committed.
+**Phase 0 — Skeleton (1 unit). ✅ DONE 2026-07-16.** CMake project, ImGui+SDL2 window, `ICpuCore`/`BusInterface`/`Device`/`Scheduler` abstractions, save-state visitor, ROM manifest loader, empty machine-config dialog, and a **per-file license audit of all vendored code.** *Accept:* window opens on Fedora; empty scheduler runs; CI green; license audit committed.
 
-**Phase 1 — 6502 core + Apple I (1 unit).** Vendor MAME 6502 (BSD) behind the adapter; pass Klaus + Harte 6502 tests. Implement the 6821 PIA + terminal. *Accept:* Apple I boots the Woz Monitor and runs a hand-entered hex program; 100% Harte 6502 pass.
+**Phase 1 — 6502 core + Apple I (1 unit). ✅ DONE 2026-07-17.** Vendor MAME 6502 (BSD) behind the adapter; pass Klaus + Harte 6502 tests. Implement the 6821 PIA + terminal. *Accept:* Apple I boots the Woz Monitor and runs a hand-entered hex program; 100% Harte 6502 pass.
+*Result:* MAME m6502 (mame0288) vendored in `src/cpu/m6502/vendor/` behind `src/cpu/mame_shim/emu.h`; Harte 65x02: 2,560,000/2,560,000 pass (three real-silicon `.lst` corrections: ANE/LXA magic $EE, classic LAS, KIL PC — see THIRDPARTY.md); Klaus 6502 functional test passes (success trap $3469; interrupt test runs when the user assembles the binary). MC6821 PIA + Apple I machine + ImGui terminal; Woz Monitor acceptance test in `test_apple1` (auto-skips until the user supplies `roms/apple1/wozmon.rom`). CI fetches/caches the CPU test data.
 
 **Phase 2 — Apple II family (2 units).** Softswitches, NTSC artifact video, speaker, Disk II Woz state machine + WOZ/DSK/PO/2MG loaders, 65C02 for enhanced models, language/80-col cards, Mockingboard. *Accept:* Apple II+ → Applesoft; IIe Enhanced boots DOS 3.3 and ProDOS; a copy-protected WOZ title boots; frame-hash matches reference for artifact color.
 
