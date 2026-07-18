@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <cmath>
 #include <cstdio>
 
 #include "core/machine.h"
@@ -157,7 +158,11 @@ void MainWindow::drawTerminal() {
     ImGui::BeginChild("##term", ImVec2(0, 0), ImGuiChildFlags_None,
                       ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
-    ImGui::TextUnformatted(terminal_.c_str());
+    // The Apple-1 terminal hardware displays a blinking "@" at the cursor
+    // position (it is not printed by the Woz Monitor).
+    std::string display = terminal_;
+    if (std::fmod(ImGui::GetTime(), 1.0) < 0.5) display.push_back('@');
+    ImGui::TextUnformatted(display.c_str());
     ImGui::PopStyleColor();
     if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1)
         ImGui::SetScrollHereY(1.0f);
