@@ -8,6 +8,7 @@
 
 #include "core/scheduler.h"
 #include "machines/apple1.h"
+#include "machines/apple2plus.h"
 #include "ui/machine_config_dialog.h"
 
 struct SDL_Window;
@@ -24,6 +25,7 @@ private:
     void drawUi();
     void startMachine();
     void drawTerminal();
+    void drawApple2Screen();
 
     Scheduler scheduler_; // idle timeline shown when no machine is running
     MachineConfig machineConfig_;
@@ -31,6 +33,7 @@ private:
     bool showDemo_ = false;
 
     std::unique_ptr<Apple1Machine> apple1_;
+    std::unique_ptr<Apple2PlusMachine> apple2_;
     std::string terminal_;
     int terminalCol_ = 0;
     std::string machineError_;

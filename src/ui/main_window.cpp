@@ -53,6 +53,8 @@ int MainWindow::run(int headlessFrames) {
         // Advance emulated time ~one display frame per host frame.
         if (apple1_)
             apple1_->run(Apple1Machine::kClockHz / 60);
+        else if (apple2_)
+            apple2_->run(Apple2PlusMachine::kClockHz / 60);
         else
             scheduler_.runUntil(scheduler_.now() + 1'000'000);
 
@@ -99,11 +101,15 @@ void MainWindow::drawUi() {
     if (configDialog_.draw(machineConfig_)) startMachine();
 
     ImGui::Begin("Status");
-    ImGui::Text("AppleBox 0.1.0 — Phase 1");
+    ImGui::Text("AppleBox 0.1.0 — Phase 2");
     if (apple1_) {
         ImGui::Text("Machine: Apple I @ 1.023 MHz");
         ImGui::Text("Master clock: %lld ticks",
                     static_cast<long long>(apple1_->scheduler().now()));
+    } else if (apple2_) {
+        ImGui::Text("Machine: Apple II+ @ 1.02 MHz");
+        ImGui::Text("Master clock: %lld ticks",
+                    static_cast<long long>(apple2_->scheduler().now()));
     } else {
         ImGui::Text("No machine running.");
         ImGui::TextDisabled("Machine > Configure... to select one.");
@@ -115,6 +121,7 @@ void MainWindow::drawUi() {
     ImGui::End();
 
     if (apple1_) drawTerminal();
+    if (apple2_) drawApple2Screen();
 
     if (showDemo_) ImGui::ShowDemoWindow(&showDemo_);
 }
@@ -122,33 +129,42 @@ void MainWindow::drawUi() {
 void MainWindow::startMachine() {
     machineError_.clear();
     apple1_.reset();
+    apple2_.reset();
     terminal_.clear();
     terminalCol_ = 0;
-    if (machineConfig_.machineId != "apple1") {
-        if (!machineConfig_.machineId.empty())
-            machineError_ = machineConfig_.machineId + ": not yet implemented";
-        return;
-    }
-    auto m = std::make_unique<Apple1Machine>();
-    if (!m->loadRoms("roms")) {
-        machineError_ = "apple1: roms/apple1/wozmon.rom missing or invalid";
-        return;
-    }
-    m->onDisplayChar = [this](char c) {
-        // 40-column display; CR is the only control character.
-        if (c == '\r') {
-            terminal_.push_back('\n');
-            terminalCol_ = 0;
-        } else if (c >= 0x20) {
-            terminal_.push_back(c);
-            if (++terminalCol_ >= 40) {
+    if (machineConfig_.machineId == "apple1") {
+        auto m = std::make_unique<Apple1Machine>();
+        if (!m->loadRoms("roms")) {
+            machineError_ = "apple1: roms/apple1/wozmon.rom missing or invalid";
+            return;
+        }
+        m->onDisplayChar = [this](char c) {
+            // 40-column display; CR is the only control character.
+            if (c == '\r') {
                 terminal_.push_back('\n');
                 terminalCol_ = 0;
+            } else if (c >= 0x20) {
+                terminal_.push_back(c);
+                if (++terminalCol_ >= 40) {
+                    terminal_.push_back('\n');
+                    terminalCol_ = 0;
+                }
             }
+        };
+        m->reset();
+        apple1_ = std::move(m);
+    } else if (machineConfig_.machineId == "apple2plus") {
+        auto m = std::make_unique<Apple2PlusMachine>();
+        if (!m->loadRoms("roms")) {
+            machineError_ =
+                "apple2plus: roms/apple2plus/apple2plus.rom missing or invalid";
+            return;
         }
-    };
-    m->reset();
-    apple1_ = std::move(m);
+        m->reset();
+        apple2_ = std::move(m);
+    } else if (!machineConfig_.machineId.empty()) {
+        machineError_ = machineConfig_.machineId + ": not yet implemented";
+    }
 }
 
 void MainWindow::drawTerminal() {
@@ -179,6 +195,38 @@ void MainWindow::drawTerminal() {
             ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
             apple1_->typeChar('\r');
         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) apple1_->typeChar(0x1b);
+    }
+    ImGui::EndChild();
+    ImGui::End();
+}
+
+void MainWindow::drawApple2Screen() {
+    ImGui::SetNextWindowSize(ImVec2(480, 440), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Apple II Screen");
+
+    ImGui::BeginChild("##a2screen", ImVec2(0, 0), ImGuiChildFlags_None);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+    if (apple2_->textMode() || apple2_->mixedMode()) {
+        for (const auto& line : apple2_->textScreen())
+            ImGui::TextUnformatted(line.c_str());
+    } else {
+        ImGui::TextDisabled("(graphics mode — renderer lands in Phase 2b)");
+    }
+    ImGui::PopStyleColor();
+
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+        ImGuiIO& io = ImGui::GetIO();
+        for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
+            unsigned c = io.InputQueueCharacters[i];
+            if (c >= 0x20 && c < 0x7f)
+                apple2_->typeChar(static_cast<char>(c));
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+            ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
+            apple2_->typeChar('\r');
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) apple2_->typeChar(0x1b);
+        if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
+            apple2_->typeChar(0x08); // left arrow
     }
     ImGui::EndChild();
     ImGui::End();

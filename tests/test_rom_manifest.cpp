@@ -66,11 +66,12 @@ int main() {
         fs::remove_all(root);
     }
 
-    // Machine catalog sanity: Phase 0 → nothing available yet.
+    // Machine catalog sanity: unimplemented machines (phase 0) are never
+    // available regardless of ROM presence; implemented ones gate on ROMs.
     {
         CHECK(machineCatalog().size() >= 30);
         for (const auto& m : machineCatalog())
-            CHECK(!machineAvailable(m, "roms"));
+            if (m.phase == 0) CHECK(!machineAvailable(m, "roms"));
     }
 
     std::printf(failures ? "%d failure(s)\n" : "all rom_manifest tests passed\n", failures);

@@ -24,6 +24,16 @@ The Woz Monitor image is the standard 256-byte dump of the Apple-1 monitor
 PROMs. With it in place, `test_apple1` also runs the Phase 1 acceptance test
 (boot to the `\` prompt, enter and run a hex program).
 
+## Apple II+ (Phase 2 — in progress)
+
+| File | Size | Location | Required |
+|------|------|----------|----------|
+| `apple2plus/apple2plus.rom` | 12288 B | $D000–$FFFF | yes |
+
+A single 12 KB image: the six 2 KB mask ROMs (D0, D8, E0, E8, F0, F8)
+concatenated in address order — Applesoft BASIC plus the Autostart Monitor.
+This is the same layout AppleWin uses for its Apple II+ ROM image.
+
 Each machine's required files, sizes, and SHA-256 hashes are declared in its
 catalog entry (see `src/core/machine.cpp`). A machine only becomes selectable
 in the configuration dialog once its required ROM set validates.
