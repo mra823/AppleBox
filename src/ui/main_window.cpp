@@ -221,9 +221,15 @@ void MainWindow::drawApple2Screen() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
     glBindTexture(GL_TEXTURE_2D, apple2Tex_);
+    // Pixel-store state is shared and is modified by ImGui's font-atlas
+    // uploads and by SDL; set it explicitly or a stale GL_UNPACK_ROW_LENGTH
+    // makes glTexImage2D read past the end of the framebuffer.
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Apple2Video::kWidth,
                  Apple2Video::kHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                  apple2Video_.framebuffer().data());
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     // 2x vertical scale corrects the Apple II's non-square pixel aspect.
     const ImVec2 size(Apple2Video::kWidth * 2.0f, Apple2Video::kHeight * 2.0f);
