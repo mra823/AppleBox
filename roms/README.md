@@ -34,6 +34,9 @@ A single 12 KB image: the six 2 KB mask ROMs (D0, D8, E0, E8, F0, F8)
 concatenated in address order — Applesoft BASIC plus the Autostart Monitor.
 This is the same layout AppleWin uses for its Apple II+ ROM image.
 
+No character-generator ROM is required: AppleBox renders text with its own
+built-in font, since the Apple character-generator ROM is copyrighted.
+
 Each machine's required files, sizes, and SHA-256 hashes are declared in its
 catalog entry (see `src/core/machine.cpp`). A machine only becomes selectable
 in the configuration dialog once its required ROM set validates.

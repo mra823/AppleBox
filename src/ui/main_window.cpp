@@ -78,6 +78,7 @@ int MainWindow::run(int headlessFrames) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
+    if (apple2Tex_) glDeleteTextures(1, &apple2Tex_);
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -201,18 +202,35 @@ void MainWindow::drawTerminal() {
 }
 
 void MainWindow::drawApple2Screen() {
-    ImGui::SetNextWindowSize(ImVec2(480, 440), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Apple II Screen");
+    // Render the current frame from machine RAM + softswitch state.
+    Apple2VideoState st;
+    st.text = apple2_->textMode();
+    st.mixed = apple2_->mixedMode();
+    st.page2 = apple2_->page2();
+    st.hires = apple2_->hires();
+    // Flash characters alternate at ~2 Hz on real hardware.
+    st.flash = std::fmod(ImGui::GetTime(), 0.5) < 0.25;
+    apple2Video_.render(apple2_->ram(), st);
 
-    ImGui::BeginChild("##a2screen", ImVec2(0, 0), ImGuiChildFlags_None);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
-    if (apple2_->textMode() || apple2_->mixedMode()) {
-        for (const auto& line : apple2_->textScreen())
-            ImGui::TextUnformatted(line.c_str());
-    } else {
-        ImGui::TextDisabled("(graphics mode — renderer lands in Phase 2b)");
+    if (apple2Tex_ == 0) {
+        glGenTextures(1, &apple2Tex_);
+        glBindTexture(GL_TEXTURE_2D, apple2Tex_);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
-    ImGui::PopStyleColor();
+    glBindTexture(GL_TEXTURE_2D, apple2Tex_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Apple2Video::kWidth,
+                 Apple2Video::kHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 apple2Video_.framebuffer().data());
+
+    // 2x vertical scale corrects the Apple II's non-square pixel aspect.
+    const ImVec2 size(Apple2Video::kWidth * 2.0f, Apple2Video::kHeight * 2.0f);
+    ImGui::SetNextWindowSize(ImVec2(size.x + 16, size.y + 36),
+                             ImGuiCond_FirstUseEver);
+    ImGui::Begin("Apple II Screen");
+    ImGui::Image(static_cast<ImTextureID>(apple2Tex_), size);
 
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
         ImGuiIO& io = ImGui::GetIO();
@@ -228,7 +246,6 @@ void MainWindow::drawApple2Screen() {
         if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
             apple2_->typeChar(0x08); // left arrow
     }
-    ImGui::EndChild();
     ImGui::End();
 }
 

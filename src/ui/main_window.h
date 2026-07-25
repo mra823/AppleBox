@@ -10,6 +10,7 @@
 #include "machines/apple1.h"
 #include "machines/apple2plus.h"
 #include "ui/machine_config_dialog.h"
+#include "video/apple2_video.h"
 
 struct SDL_Window;
 
@@ -34,6 +35,8 @@ private:
 
     std::unique_ptr<Apple1Machine> apple1_;
     std::unique_ptr<Apple2PlusMachine> apple2_;
+    Apple2Video apple2Video_;
+    unsigned apple2Tex_ = 0; // GL texture (created lazily)
     std::string terminal_;
     int terminalCol_ = 0;
     std::string machineError_;
