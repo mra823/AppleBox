@@ -75,6 +75,8 @@ add_library(applebox_core STATIC
   src/devices/pia6821.cpp
   src/machines/apple1.cpp
   src/machines/apple2plus.cpp
+  src/media/gcr6.cpp
+  src/media/disk_image.cpp
   src/video/apple2_video.cpp
 )
 target_include_directories(applebox_core PUBLIC src)
@@ -93,7 +95,7 @@ target_compile_options(applebox PRIVATE -Wall -Wextra)
 # --- Tests ---
 if(APPLEBOX_BUILD_TESTS)
   enable_testing()
-  foreach(t scheduler savestate rom_manifest apple1 apple2plus apple2_video harte_6502 klaus_6502)
+  foreach(t scheduler savestate rom_manifest apple1 apple2plus apple2_video disk_image harte_6502 klaus_6502)
     add_executable(test_${t} tests/test_${t}.cpp)
     target_link_libraries(test_${t} PRIVATE applebox_core)
     add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
