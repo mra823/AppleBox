@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <memory>
 #include <string>
-
 #include "core/scheduler.h"
 #include "machines/apple1.h"
 #include "machines/apple2plus.h"
@@ -27,6 +26,7 @@ private:
     void startMachine();
     void drawTerminal();
     void drawApple2Screen();
+    void drawDiskUi();
 
     Scheduler scheduler_; // idle timeline shown when no machine is running
     MachineConfig machineConfig_;
@@ -40,6 +40,8 @@ private:
     std::string terminal_;
     int terminalCol_ = 0;
     std::string machineError_;
+    std::array<char, 512> diskPath_{};
+    std::string diskError_;
 };
 
 } // namespace ab

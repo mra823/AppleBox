@@ -14,6 +14,7 @@
 #include "core/bus.h"
 #include "core/scheduler.h"
 #include "cpu/m6502/m6502_core.h"
+#include "devices/disk2.h"
 
 namespace ab {
 
@@ -28,6 +29,11 @@ public:
     // ROMs: 12 KB Autostart+Applesoft image at $D000-$FFFF.
     bool loadRoms(const std::filesystem::path& romRoot);
     void setRom(std::span<const u8> rom); // 12288 bytes
+
+    // Disk II card in slot 6. Present only when its 256-byte boot ROM has
+    // been supplied; without it the machine still boots to BASIC.
+    Disk2Controller& disk2() { return disk2_; }
+    const Disk2Controller& disk2() const { return disk2_; }
 
     void reset();
     void run(Ticks cycles);
@@ -67,6 +73,7 @@ private:
     std::array<u8, 0xC000> ram_{};  // $0000-$BFFF
     std::array<u8, 0x3000> rom_{};  // $D000-$FFFF
     bool hasRom_ = false;
+    Disk2Controller disk2_;         // slot 6
 
     // Keyboard latch: bit 7 = strobe, bits 6..0 = last key.
     u8 kbdLatch_ = 0;

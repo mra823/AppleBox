@@ -343,11 +343,19 @@ public:
     // Run the core for `cycles`; returns cycles actually consumed.
     s64 shim_run(s64 cycles) {
         stolen_ = 0;
+        slice_ = cycles;
         *icountptr_ = static_cast<int>(cycles);
         execute_run();
         s64 consumed = cycles - *icountptr_ - stolen_;
         total_cycles_ += consumed;
+        slice_ = 0;
         return consumed;
+    }
+    // Cycle count including the slice in progress, so devices touched from a
+    // bus access mid-instruction see the correct time.
+    s64 shim_cycles_now() const {
+        if (slice_ == 0 || !icountptr_) return total_cycles_;
+        return total_cycles_ + (slice_ - *icountptr_ - stolen_);
     }
     // Abort the current timeslice (a device scheduled an event mid-slice);
     // the core stops at the next resumable point and shim_run returns the
@@ -394,6 +402,7 @@ private:
     int* icountptr_ = nullptr;
     s64 total_cycles_ = 0;
     s64 stolen_ = 0;
+    s64 slice_ = 0;
 };
 
 // The cores call save_item(NAME(m_field)) as a member; forward to the no-op

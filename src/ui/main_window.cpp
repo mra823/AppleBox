@@ -122,7 +122,10 @@ void MainWindow::drawUi() {
     ImGui::End();
 
     if (apple1_) drawTerminal();
-    if (apple2_) drawApple2Screen();
+    if (apple2_) {
+        drawApple2Screen();
+        if (apple2_->disk2().hasBootRom()) drawDiskUi();
+    }
 
     if (showDemo_) ImGui::ShowDemoWindow(&showDemo_);
 }
@@ -252,6 +255,56 @@ void MainWindow::drawApple2Screen() {
         if (ImGui::IsKeyPressed(ImGuiKey_Backspace))
             apple2_->typeChar(0x08); // left arrow
     }
+    ImGui::End();
+}
+
+void MainWindow::drawDiskUi() {
+    auto& card = apple2_->disk2();
+    ImGui::SetNextWindowSize(ImVec2(460, 200), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Disk II (slot 6)");
+
+    ImGui::Text("Motor: %s   Head: track %.1f   Active: drive %d",
+                card.motorOn() ? "on" : "off", card.headTrack(),
+                card.selectedDrive() + 1);
+    ImGui::Separator();
+
+    ImGui::InputText("Image path", diskPath_.data(), diskPath_.size());
+    ImGui::TextDisabled("Accepts .dsk .do .po .2mg .nib .woz");
+
+    for (int i = 0; i < Disk2Controller::kDrives; ++i) {
+        ImGui::PushID(i);
+        const auto& d = card.drive(i);
+        ImGui::Text("Drive %d: %s", i + 1,
+                    d.disk ? d.disk->name().c_str() : "(empty)");
+        if (d.disk) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("[%s%s]", d.disk->format().c_str(),
+                                d.disk->writeProtected() ? ", write protected"
+                                                         : "");
+        }
+        if (ImGui::Button("Insert")) {
+            diskError_.clear();
+            std::string err;
+            if (!card.insertDisk(i, diskPath_.data(), &err))
+                diskError_ = err;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Eject")) card.ejectDisk(i);
+        ImGui::SameLine();
+        if (ImGui::Button("Insert + Reboot")) {
+            diskError_.clear();
+            std::string err;
+            if (card.insertDisk(i, diskPath_.data(), &err))
+                apple2_->reset();
+            else
+                diskError_ = err;
+        }
+        ImGui::PopID();
+    }
+
+    if (!diskError_.empty())
+        ImGui::TextColored(ImVec4(1.f, 0.4f, 0.4f, 1.f), "%s",
+                           diskError_.c_str());
     ImGui::End();
 }
 

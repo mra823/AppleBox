@@ -29,10 +29,16 @@ PROMs. With it in place, `test_apple1` also runs the Phase 1 acceptance test
 | File | Size | Location | Required |
 |------|------|----------|----------|
 | `apple2plus/apple2plus.rom` | 12288 B | $D000–$FFFF | yes |
+| `apple2plus/disk2.rom` | 256 B | $C600–$C6FF | no |
 
 A single 12 KB image: the six 2 KB mask ROMs (D0, D8, E0, E8, F0, F8)
 concatenated in address order — Applesoft BASIC plus the Autostart Monitor.
 This is the same layout AppleWin uses for its Apple II+ ROM image.
+
+`disk2.rom` is the Disk II controller's 256-byte P5 boot PROM (16-sector).
+Supply it to install the card in slot 6 and boot from disk images; without
+it the machine still starts into BASIC. Supported image formats: `.dsk`,
+`.do`, `.po`, `.2mg`, `.nib` and `.woz` (WOZ 1 and 2).
 
 No character-generator ROM is required: AppleBox renders text with its own
 built-in font, since the Apple character-generator ROM is copyrighted.

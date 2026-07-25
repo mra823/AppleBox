@@ -34,6 +34,10 @@ public:
     // executed instruction). Used by steppers and the test harness.
     bool atInstructionBoundary() const;
 
+    // Cycles executed since power-on, including the slice in progress, so
+    // devices reached from a bus access see the correct time.
+    Ticks cycles() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

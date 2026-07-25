@@ -178,4 +178,6 @@ void M6502Core::serialize(StateVisitor& v) { impl_->serializeState(v); }
 
 bool M6502Core::atInstructionBoundary() const { return impl_->boundary(); }
 
+Ticks M6502Core::cycles() const { return impl_->shim_cycles_now(); }
+
 } // namespace ab

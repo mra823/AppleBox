@@ -23,6 +23,9 @@ bool Apple2PlusMachine::loadRoms(const std::filesystem::path& romRoot) {
         loadRom(romRoot, "apple2plus", {"apple2plus.rom", 0x3000, "", false});
     if (!rom) return false;
     setRom(*rom);
+    // The Disk II card is optional: with no boot ROM, slot 6 stays empty.
+    if (auto d2 = loadRom(romRoot, "apple2plus", {"disk2.rom", 0x100, "", true}))
+        disk2_.setBootRom(*d2);
     return true;
 }
 
@@ -40,6 +43,7 @@ void Apple2PlusMachine::reset() {
     hires_ = false;
     annunciators_ = {};
     speakerToggles_ = 0;
+    disk2_.reset();
     cpu_.reset();
 }
 
@@ -138,8 +142,18 @@ u8 Apple2PlusMachine::ioAccess(u16 addr, bool isWrite, u8 val) {
 u8 Apple2PlusMachine::read8(u32 addr, AddrSpace) {
     addr &= 0xffff;
     if (addr < 0xc000) return ram_[addr];
-    if (addr < 0xc100) return ioAccess(static_cast<u16>(addr), false, 0);
-    if (addr < 0xd000) return 0x00; // empty slot / expansion ROM space
+    if (addr < 0xc100) {
+        // Slot 6 device I/O ($C0E0-$C0EF) is the Disk II card.
+        if (addr >= 0xc0e0 && addr <= 0xc0ef && disk2_.hasBootRom())
+            return disk2_.io(static_cast<u8>(addr & 0x0f), false, 0,
+                             cpu_.cycles());
+        return ioAccess(static_cast<u16>(addr), false, 0);
+    }
+    if (addr < 0xd000) {
+        if (addr >= 0xc600 && addr <= 0xc6ff && disk2_.hasBootRom())
+            return disk2_.readRom(static_cast<u8>(addr & 0xff));
+        return 0x00; // empty slot / expansion ROM space
+    }
     return hasRom_ ? rom_[addr - 0xd000] : 0x00;
 }
 
@@ -150,6 +164,10 @@ void Apple2PlusMachine::write8(u32 addr, u8 val, AddrSpace) {
         return;
     }
     if (addr < 0xc100) {
+        if (addr >= 0xc0e0 && addr <= 0xc0ef && disk2_.hasBootRom()) {
+            disk2_.io(static_cast<u8>(addr & 0x0f), true, val, cpu_.cycles());
+            return;
+        }
         ioAccess(static_cast<u16>(addr), true, val);
         return;
     }
