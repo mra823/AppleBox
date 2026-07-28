@@ -14,6 +14,12 @@ void Disk2Controller::setBootRom(std::span<const u8> rom) {
     hasBootRom_ = true;
 }
 
+void Disk2Controller::removeCard() {
+    bootRom_.fill(0);
+    hasBootRom_ = false;
+    reset();
+}
+
 bool Disk2Controller::insertDisk(int drive, const std::filesystem::path& path,
                                  std::string* error) {
     if (drive < 0 || drive >= kDrives) return false;
@@ -34,10 +40,11 @@ void Disk2Controller::ejectDisk(int drive) {
 void Disk2Controller::reset() {
     selected_ = 0;
     motorOn_ = false;
+    motorOffCycle_ = -kSpinDownCycles;
     writeMode_ = false;
     loadMode_ = false;
     dataRegister_ = 0;
-    holdCells_ = 0;
+    shifter_ = 0;
     bitFraction_ = 0.0;
     for (auto& d : drives_) d.phaseMagnets = 0;
 }
@@ -77,7 +84,7 @@ void Disk2Controller::updateStepper(int drive, int phase, bool on) {
 void Disk2Controller::spinTo(s64 cycles) {
     const s64 elapsed = cycles - lastCycles_;
     lastCycles_ = cycles;
-    if (!motorOn_ || elapsed <= 0) return;
+    if (!spinning(cycles) || elapsed <= 0) return;
 
     bitFraction_ += static_cast<double>(elapsed) / kCyclesPerBit;
     s64 cells = static_cast<s64>(bitFraction_);
@@ -102,12 +109,20 @@ void Disk2Controller::spinTo(s64 cycles) {
             d.bitPos = (d.bitPos + 1) % track.bitCount;
             continue;
         }
-        // A completed nibble stalls assembly until the CPU consumes it, so
-        // no bits of the following nibble are lost.
-        if (dataRegister_ & 0x80) break;
+        // Free-running read: bits shift in continuously while the motor
+        // turns, exactly as the drive does. Since every disk nibble has its
+        // high bit set, the register self-frames on nibble boundaries; a
+        // completed nibble is latched for the CPU and assembly continues.
+        // The disk does NOT wait for the CPU: software that samples the data
+        // register to decide whether the drive is spinning (DOS's RWTS does,
+        // to skip its one-second motor spin-up wait) sees it keep changing.
         const u8 bit = track.bit(d.bitPos) ? 1 : 0;
         d.bitPos = (d.bitPos + 1) % track.bitCount;
-        dataRegister_ = static_cast<u8>((dataRegister_ << 1) | bit);
+        shifter_ = static_cast<u8>((shifter_ << 1) | bit);
+        if (shifter_ & 0x80) {
+            dataRegister_ = shifter_;
+            shifter_ = 0;
+        }
     }
 }
 
@@ -119,7 +134,10 @@ u8 Disk2Controller::io(u8 offset, bool isWrite, u8 value, s64 cycles) {
         case 0x4: case 0x5: case 0x6: case 0x7:
             updateStepper(selected_, (offset >> 1) & 3, offset & 1);
             break;
-        case 0x8: motorOn_ = false; break;
+        case 0x8:
+            if (motorOn_) motorOffCycle_ = cycles; // start the coast
+            motorOn_ = false;
+            break;
         case 0x9: motorOn_ = true; break;
         case 0xa: selected_ = 0; break;
         case 0xb: selected_ = 1; break;
@@ -131,13 +149,10 @@ u8 Disk2Controller::io(u8 offset, bool isWrite, u8 value, s64 cycles) {
 
     if (!writeMode_) {
         if (!loadMode_) {
-            // Read the data register; a completed nibble is consumed so
-            // assembly of the next one resumes.
+            // Read the data register; the latched nibble is consumed so the
+            // CPU's next poll waits for a fresh one.
             const u8 v = dataRegister_;
-            if (!isWrite && (v & 0x80)) {
-                dataRegister_ = 0;
-                spinTo(cycles); // resume immediately with any spare cells
-            }
+            if (!isWrite && (v & 0x80)) dataRegister_ = 0;
             return v;
         }
         // Q6H + Q7L: write-protect sense in bit 7.
@@ -151,10 +166,13 @@ u8 Disk2Controller::io(u8 offset, bool isWrite, u8 value, s64 cycles) {
 void Disk2Controller::serialize(StateVisitor& v) {
     v.value("disk2.selected", selected_);
     v.value("disk2.motorOn", motorOn_);
+    v.value("disk2.motorOffCycle", motorOffCycle_);
     v.value("disk2.writeMode", writeMode_);
     v.value("disk2.loadMode", loadMode_);
     v.value("disk2.dataRegister", dataRegister_);
+    v.value("disk2.shifter", shifter_);
     v.value("disk2.lastCycles", lastCycles_);
+    v.value("disk2.bitFraction", bitFraction_);
     for (int i = 0; i < kDrives; ++i) {
         const std::string p = "disk2.drive" + std::to_string(i);
         v.value(p + ".quarterTrack", drives_[i].quarterTrack);

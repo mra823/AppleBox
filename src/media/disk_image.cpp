@@ -16,12 +16,13 @@ constexpr std::size_t kSectorImageSize = 143360; // 35 × 16 × 256
 constexpr std::size_t kNibTrackSize = 6656;
 constexpr std::size_t kNibImageSize = kNibTrackSize * 35;
 
-// Physical sector -> logical (image) sector. DOS 3.3 uses a 2:1 soft skew;
-// ProDOS images are stored in block order.
-constexpr u8 kDosPhysToLog[16] = {0, 13, 11, 9, 7, 5, 3, 1,
-                                  14, 12, 10, 8, 6, 4, 2, 15};
-constexpr u8 kProdosPhysToLog[16] = {0, 2, 4, 6, 8, 10, 12, 14,
-                                     1, 3, 5, 7, 9, 11, 13, 15};
+// Physical sector -> logical (image) sector. Verified empirically by matching
+// a real WOZ bit-image of the DOS 3.3 System Master against the same disk's
+// .dsk sector image across several tracks.
+constexpr u8 kDosPhysToLog[16] = {0, 7, 14, 6, 13, 5, 12, 4,
+                                  11, 3, 10, 2, 9, 1, 8, 15};
+constexpr u8 kProdosPhysToLog[16] = {0, 8, 1, 9, 2, 10, 3, 11,
+                                     4, 12, 5, 13, 6, 14, 7, 15};
 
 // Track layout: a 300 RPM disk at 4 µs per bit cell holds ~50,000 bits.
 constexpr int kGap1SyncBytes = 64;
@@ -273,16 +274,21 @@ bool DiskImage::loadWoz(std::span<const u8> file, DiskImage& out,
                           file.begin() + byteOff + byteLen);
             t.bitCount = bitCount;
         } else {
-            // WOZ1: fixed 6656-byte records, trailing bytesUsed/bitCount.
+            // WOZ1: fixed 6656-byte records — 6646 bytes of bit data, then
+            // bytesUsed (6646), bitCount (6648), splice info.
             const std::size_t rec = idx * 6656u;
             if (rec + 6656 > trks.size()) continue;
-            const u32 bitCount = rd16(trks, rec + 6648 + 2);
+            const u32 bitCount = rd16(trks, rec + 6648);
             if (bitCount == 0) continue;
             const std::size_t byteLen =
                 std::min<std::size_t>(6646, (bitCount + 7) / 8);
             t.bits.assign(trks.begin() + rec, trks.begin() + rec + byteLen);
             t.bitCount = bitCount;
         }
+        // A truncated or short record must never let Track::bit() index past
+        // the end of the buffer.
+        if (t.bits.size() * 8 < t.bitCount)
+            t.bits.resize((t.bitCount + 7) / 8, 0);
         out.tracks_[q] = std::move(t);
     }
     return true;

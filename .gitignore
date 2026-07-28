@@ -6,3 +6,4 @@ tests/data/
 .cache/
 compile_commands.json
 imgui.ini
+disks/

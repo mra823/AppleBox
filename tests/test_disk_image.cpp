@@ -53,10 +53,13 @@ void writeFile(const fs::path& p, std::span<const u8> data) {
 // Verifies a disk decodes back to the original image under `physToLog`.
 void checkDisk(const DiskImage& disk, const std::vector<u8>& img,
                bool prodosOrder, const char* label) {
-    static constexpr u8 kDos[16] = {0, 13, 11, 9, 7, 5, 3, 1,
-                                    14, 12, 10, 8, 6, 4, 2, 15};
-    static constexpr u8 kPro[16] = {0, 2, 4, 6, 8, 10, 12, 14,
-                                    1, 3, 5, 7, 9, 11, 13, 15};
+    // Pinned skew tables. These were verified against a real WOZ bit-image of
+    // the DOS 3.3 System Master: a round-trip test alone cannot catch an
+    // inverted table, because encode and decode would agree with each other.
+    static constexpr u8 kDos[16] = {0, 7, 14, 6, 13, 5, 12, 4,
+                                    11, 3, 10, 2, 9, 1, 8, 15};
+    static constexpr u8 kPro[16] = {0, 8, 1, 9, 2, 10, 3, 11,
+                                    4, 12, 5, 13, 6, 14, 7, 15};
     const u8* physToLog = prodosOrder ? kPro : kDos;
 
     int checked = 0;
@@ -207,6 +210,24 @@ int main() {
     }
 
     const auto img = makeSectorImage();
+
+    // --- Skew tables pinned to real-disk values ----------------------------
+    // Each logical sector's first bytes identify it, so decoding a track tells
+    // us exactly which logical sector sits at each physical position.
+    {
+        auto dos = DiskImage::fromSectorImage(img, false);
+        auto sectors = decodeTrack(dos.track(0));
+        static constexpr u8 kWantDos[16] = {0, 7, 14, 6, 13, 5, 12, 4,
+                                            11, 3, 10, 2, 9, 1, 8, 15};
+        int checked = 0;
+        for (const auto& s : sectors) {
+            // makeSectorImage() stamps [track, logicalSector] at offset 0.
+            CHECK(s.data[1] == kWantDos[s.sector]);
+            ++checked;
+        }
+        CHECK(checked == 16);
+        std::printf("PASS DOS 3.3 skew matches the real-disk table\n");
+    }
 
     // --- DOS 3.3 and ProDOS interleaves ------------------------------------
     {

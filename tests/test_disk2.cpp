@@ -31,9 +31,9 @@ int failures = 0;
         }                                                                 \
     } while (0)
 
-// DOS 3.3 physical -> logical sector skew.
-constexpr u8 kDosPhysToLog[16] = {0, 13, 11, 9, 7, 5, 3, 1,
-                                  14, 12, 10, 8, 6, 4, 2, 15};
+// DOS 3.3 physical -> logical sector skew (verified against a real WOZ image).
+constexpr u8 kDosPhysToLog[16] = {0, 7, 14, 6, 13, 5, 12, 4,
+                                  11, 3, 10, 2, 9, 1, 8, 15};
 
 // A 6502 program that (1) starts the motor, (2) takes $02 half-track steps
 // by pulsing the stepper phases in sequence, and (3) fills $1000-$2FFF with

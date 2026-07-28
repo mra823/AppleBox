@@ -24,6 +24,11 @@ public:
     // 1 bit cell = 4 us. At the Apple II's ~1.0205 MHz that is 4.082 CPU
     // cycles; the fractional part is carried so long-term speed stays right.
     static constexpr double kCyclesPerBit = 4.0;
+    // The card holds the drive motor on for about a second after the
+    // motor-off switch is hit (a one-shot on the analogue card), so the disk
+    // coasts. DOS relies on this: it samples the data register and skips its
+    // one-second spin-up wait when the disk is still turning.
+    static constexpr s64 kSpinDownCycles = 1'020'484;
 
     struct Drive {
         std::optional<media::DiskImage> disk;
@@ -38,6 +43,9 @@ public:
 
     // Boot ROM at $Cs00 (256 bytes, user-supplied).
     void setBootRom(std::span<const u8> rom);
+    // Pull the card out of the slot: the slot reads as empty again, so an
+    // Autostart ROM falls through to BASIC instead of booting the drive.
+    void removeCard();
     bool hasBootRom() const { return hasBootRom_; }
     u8 readRom(u8 offset) const { return bootRom_[offset]; }
 
@@ -48,6 +56,11 @@ public:
     const Drive& drive(int i) const { return drives_[i]; }
     int selectedDrive() const { return selected_; }
     bool motorOn() const { return motorOn_; }
+    // True while the disk is actually turning, including the coast after the
+    // motor switch is turned off.
+    bool spinning(s64 cycles) const {
+        return motorOn_ || cycles < motorOffCycle_ + kSpinDownCycles;
+    }
     // Current head position in whole tracks (for the UI).
     double headTrack() const { return drives_[selected_].quarterTrack / 4.0; }
 
@@ -61,10 +74,11 @@ private:
     std::array<Drive, kDrives> drives_{};
     int selected_ = 0;
     bool motorOn_ = false;
+    s64 motorOffCycle_ = -kSpinDownCycles; // when the motor switch went off
     bool writeMode_ = false; // Q7
     bool loadMode_ = false;  // Q6
     u8 dataRegister_ = 0;
-    int holdCells_ = 0; // bit cells a completed nibble has been held
+    u8 shifter_ = 0; // read shift register assembling the next nibble
     s64 lastCycles_ = 0;
     double bitFraction_ = 0.0;
 
