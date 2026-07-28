@@ -43,6 +43,12 @@ void Apple2PlusMachine::reset() {
     hires_ = false;
     annunciators_ = {};
     speakerToggles_ = 0;
+    // Reset deselects card RAM for reads so $FFFC always fetches the ROM
+    // reset vector; the card's contents survive, as on real hardware.
+    lcBank1_ = false;
+    lcReadRam_ = false;
+    lcWriteRam_ = true;
+    lcPreWrite_ = false;
     disk2_.reset();
     cpu_.reset();
 }
@@ -94,6 +100,26 @@ std::array<std::string, 24> Apple2PlusMachine::textScreen() const {
     return out;
 }
 
+// $C080-$C08F. A3 picks the $D000 bank; A1..A0 pick the read source and arm
+// the write flip-flop:
+//   x0 read RAM, no write   x1 read ROM, write RAM
+//   x2 read ROM, no write   x3 read RAM, write RAM
+// Writing to card RAM takes two consecutive *reads* of an odd address — a
+// single read, or any write, leaves it disabled. This is what stops a stray
+// STA from clobbering the card, and software relies on it.
+void Apple2PlusMachine::languageCardSwitch(u16 addr, bool isWrite) {
+    lcBank1_ = (addr & 0x08) != 0;
+    const int sel = addr & 0x03;
+    lcReadRam_ = (sel == 0 || sel == 3);
+    if (addr & 1) {
+        if (lcPreWrite_) lcWriteRam_ = true;
+        lcPreWrite_ = !isWrite; // only a read arms the flip-flop
+    } else {
+        lcPreWrite_ = false;
+        lcWriteRam_ = false;
+    }
+}
+
 u8 Apple2PlusMachine::ioAccess(u16 addr, bool isWrite, u8 val) {
     (void)val;
     switch (addr & 0xfff0) {
@@ -132,6 +158,9 @@ u8 Apple2PlusMachine::ioAccess(u16 addr, bool isWrite, u8 val) {
             }
         case 0xc070: // paddle trigger
             return 0x00;
+        case 0xc080: // language card bank/read/write select (slot 0)
+            if (hasLanguageCard_) languageCardSwitch(addr, isWrite);
+            return 0x00;
         default:
             // Cassette, empty I/O: floating bus (simplified to 0).
             return 0x00;
@@ -154,6 +183,8 @@ u8 Apple2PlusMachine::read8(u32 addr, AddrSpace) {
             return disk2_.readRom(static_cast<u8>(addr & 0xff));
         return 0x00; // empty slot / expansion ROM space
     }
+    if (hasLanguageCard_ && lcReadRam_)
+        return lcRam_[lcOffset(static_cast<u16>(addr))];
     return hasRom_ ? rom_[addr - 0xd000] : 0x00;
 }
 
@@ -169,6 +200,10 @@ void Apple2PlusMachine::write8(u32 addr, u8 val, AddrSpace) {
             return;
         }
         ioAccess(static_cast<u16>(addr), true, val);
+        return;
+    }
+    if (addr >= 0xd000 && hasLanguageCard_ && lcWriteRam_) {
+        lcRam_[lcOffset(static_cast<u16>(addr))] = val;
         return;
     }
     // Slot space and ROM: writes ignored.

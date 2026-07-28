@@ -35,6 +35,16 @@ public:
     Disk2Controller& disk2() { return disk2_; }
     const Disk2Controller& disk2() const { return disk2_; }
 
+    // 16K language card in slot 0 (making a 64K II+). Software that needs
+    // 64K — Integer BASIC from disk, ProDOS, many later titles — requires it.
+    void setLanguageCard(bool present) { hasLanguageCard_ = present; }
+    bool hasLanguageCard() const { return hasLanguageCard_; }
+    // Bank 1 vs bank 2 of the $D000-$DFFF window, and whether reads/writes
+    // in $D000-$FFFF land on card RAM rather than ROM.
+    bool lcBank1() const { return lcBank1_; }
+    bool lcReadRam() const { return lcReadRam_; }
+    bool lcWriteRam() const { return lcWriteRam_; }
+
     void reset();
     void run(Ticks cycles);
 
@@ -65,6 +75,13 @@ public:
 
 private:
     u8 ioAccess(u16 addr, bool isWrite, u8 val);
+    void languageCardSwitch(u16 addr, bool isWrite);
+    // Offset into lcRam_ for a $D000-$FFFF address, honouring the bank select.
+    std::size_t lcOffset(u16 addr) const {
+        if (addr < 0xe000)
+            return (lcBank1_ ? 0u : 0x1000u) + (addr - 0xd000u);
+        return 0x2000u + (addr - 0xe000u);
+    }
     void feedKeyboard();
 
     Scheduler scheduler_;
@@ -74,6 +91,14 @@ private:
     std::array<u8, 0x3000> rom_{};  // $D000-$FFFF
     bool hasRom_ = false;
     Disk2Controller disk2_;         // slot 6
+
+    // Language card: bank 1 and bank 2 of $D000-$DFFF then $E000-$FFFF.
+    std::array<u8, 0x4000> lcRam_{};
+    bool hasLanguageCard_ = true;
+    bool lcBank1_ = false;   // reset selects bank 2
+    bool lcReadRam_ = false; // reset reads ROM, so the machine can boot
+    bool lcWriteRam_ = true;
+    bool lcPreWrite_ = false; // odd-address read seen; a second one enables writes
 
     // Keyboard latch: bit 7 = strobe, bits 6..0 = last key.
     u8 kbdLatch_ = 0;

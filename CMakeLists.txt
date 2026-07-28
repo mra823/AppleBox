@@ -96,7 +96,7 @@ target_compile_options(applebox PRIVATE -Wall -Wextra)
 # --- Tests ---
 if(APPLEBOX_BUILD_TESTS)
   enable_testing()
-  foreach(t scheduler savestate rom_manifest apple1 apple2plus apple2_video disk_image disk2 dos33 harte_6502 klaus_6502)
+  foreach(t scheduler savestate rom_manifest apple1 apple2plus apple2_video disk_image disk2 dos33 language_card harte_6502 klaus_6502)
     add_executable(test_${t} tests/test_${t}.cpp)
     target_link_libraries(test_${t} PRIVATE applebox_core)
     add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
