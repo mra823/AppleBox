@@ -51,14 +51,37 @@ add_custom_command(
   DEPENDS ${M6502_VENDOR}/m6502make.py ${M6502_VENDOR}/dm6502.lst
   COMMENT "Generating m6502d.hxx (MAME m6502make.py)"
 )
+add_custom_command(
+  OUTPUT ${M6502_GEN}/w65c02.hxx
+  COMMAND Python3::Interpreter ${M6502_VENDOR}/m6502make.py s w65c02
+          ${M6502_VENDOR}/ow65c02.lst ${M6502_VENDOR}/dw65c02.lst
+          ${M6502_GEN}/w65c02.hxx
+  DEPENDS ${M6502_VENDOR}/m6502make.py ${M6502_VENDOR}/ow65c02.lst
+          ${M6502_VENDOR}/dw65c02.lst
+  COMMENT "Generating w65c02.hxx (MAME m6502make.py)"
+)
+add_custom_command(
+  OUTPUT ${M6502_GEN}/w65c02d.hxx
+  COMMAND Python3::Interpreter ${M6502_VENDOR}/m6502make.py d w65c02
+          ${M6502_VENDOR}/ow65c02.lst ${M6502_VENDOR}/dw65c02.lst
+          ${M6502_GEN}/w65c02d.hxx
+  DEPENDS ${M6502_VENDOR}/m6502make.py ${M6502_VENDOR}/ow65c02.lst
+          ${M6502_VENDOR}/dw65c02.lst
+  COMMENT "Generating w65c02d.hxx (MAME m6502make.py)"
+)
 add_library(ab_m6502 STATIC
   ${M6502_VENDOR}/m6502.cpp
   ${M6502_VENDOR}/m6502d.cpp
+  ${M6502_VENDOR}/w65c02.cpp
+  ${M6502_VENDOR}/w65c02d.cpp
   src/cpu/m6502/m6502_core.cpp
   ${M6502_GEN}/m6502.hxx
   ${M6502_GEN}/m6502d.hxx
+  ${M6502_GEN}/w65c02.hxx
+  ${M6502_GEN}/w65c02d.hxx
 )
 set_source_files_properties(${M6502_GEN}/m6502.hxx ${M6502_GEN}/m6502d.hxx
+  ${M6502_GEN}/w65c02.hxx ${M6502_GEN}/w65c02d.hxx
   PROPERTIES HEADER_FILE_ONLY ON GENERATED ON)
 target_include_directories(ab_m6502
   PUBLIC src
@@ -102,6 +125,10 @@ if(APPLEBOX_BUILD_TESTS)
     add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(${t} PROPERTIES SKIP_RETURN_CODE 77)
   endforeach()
-  set_tests_properties(harte_6502 PROPERTIES TIMEOUT 3600)
+  # The 65C02 reuses the 6502 harness binary with a different opcode set.
+  add_test(NAME harte_65c02 COMMAND test_harte_6502 65c02
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_tests_properties(harte_65c02 PROPERTIES SKIP_RETURN_CODE 77)
+  set_tests_properties(harte_6502 harte_65c02 PROPERTIES TIMEOUT 3600)
   set_tests_properties(klaus_6502 PROPERTIES TIMEOUT 600)
 endif()

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # AppleBox — fetch CPU test data (never committed; see .gitignore).
-#   tests/data/harte/6502/v1/   Tom Harte SingleStepTests (6502, 10k/opcode)
-#   tests/data/klaus/           Klaus Dormann functional + interrupt binaries
+#   tests/data/harte/6502/v1/             SingleStepTests 6502 (10k/opcode)
+#   tests/data/harte/synertek65c02/v1/    SingleStepTests 65C02
+#   tests/data/klaus/                     Klaus Dormann functional + interrupt
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -10,17 +11,26 @@ DATA=tests/data
 mkdir -p "$DATA"
 
 # --- Tom Harte SingleStepTests (6502) --------------------------------------
-if [ ! -d "$DATA/harte/6502/v1" ]; then
-    echo "Fetching SingleStepTests 6502 (sparse clone, ~600 MB)..."
+# MAME's w65c02 implements the plain CMOS opcode map (no Rockwell
+# RMB/SMB/BBR/BBS, no WDC WAI/STP), so the matching test set is
+# synertek65c02 rather than the similarly named wdc65c02.
+want=()
+[ -d "$DATA/harte/6502/v1" ] || want+=("6502/v1")
+[ -d "$DATA/harte/synertek65c02/v1" ] || want+=("synertek65c02/v1")
+
+if [ ${#want[@]} -gt 0 ]; then
+    echo "Fetching SingleStepTests ${want[*]} (sparse clone, ~600 MB each)..."
     tmp=$(mktemp -d)
     git clone --depth 1 --filter=blob:none --sparse \
         https://github.com/SingleStepTests/65x02.git "$tmp/65x02"
-    git -C "$tmp/65x02" sparse-checkout set 6502/v1
-    mkdir -p "$DATA/harte/6502"
-    mv "$tmp/65x02/6502/v1" "$DATA/harte/6502/v1"
+    git -C "$tmp/65x02" sparse-checkout set "${want[@]}"
+    for w in "${want[@]}"; do
+        mkdir -p "$DATA/harte/$(dirname "$w")"
+        mv "$tmp/65x02/$w" "$DATA/harte/$w"
+    done
     rm -rf "$tmp"
 else
-    echo "Harte 6502 data already present."
+    echo "Harte 6502/65C02 data already present."
 fi
 
 # --- Klaus Dormann test binaries (pinned commit) ----------------------------

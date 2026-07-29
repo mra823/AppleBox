@@ -1,4 +1,4 @@
-// AppleBox — ICpuCore adapter for the vendored MAME m6502 core.
+// AppleBox — ICpuCore adapter for the vendored MAME 6502-family cores.
 // SPDX-License-Identifier: MIT
 #pragma once
 
@@ -8,13 +8,23 @@
 
 namespace ab {
 
-// NMOS 6502 (MAME core behind the scenes). Cycle-stepped: run(1) advances
-// one clock/bus cycle. setRegister("PC", v) re-syncs the prefetch pipeline
-// and performs the opcode fetch bus cycle, matching hardware.
+// Which member of the family to instantiate. The CMOS part adds the 65C02
+// instructions and fixes the NMOS indirect-JMP page-wrap bug, so machines
+// must pick deliberately: an Apple II/II+ is NMOS, an enhanced IIe is CMOS.
+enum class M6502Variant {
+    Nmos6502, // MOS 6502
+    W65C02,   // WDC 65C02 (enhanced IIe, IIc)
+};
+
+// Cycle-stepped: run(1) advances one clock/bus cycle. setRegister("PC", v)
+// re-syncs the prefetch pipeline and performs the opcode fetch bus cycle,
+// matching hardware.
 class M6502Core final : public ICpuCore {
 public:
-    M6502Core();
+    explicit M6502Core(M6502Variant variant = M6502Variant::Nmos6502);
     ~M6502Core() override;
+
+    M6502Variant variant() const;
 
     std::string name() const override;
     void attachBus(BusInterface& bus) override;
