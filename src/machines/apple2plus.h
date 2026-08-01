@@ -11,6 +11,7 @@
 #include <span>
 #include <string>
 
+#include "audio/speaker.h"
 #include "core/bus.h"
 #include "core/scheduler.h"
 #include "cpu/m6502/m6502_core.h"
@@ -66,8 +67,10 @@ public:
     M6502Core& cpu() { return cpu_; }
     const std::array<u8, 0xC000>& ram() const { return ram_; }
 
-    // Speaker toggles since power-on ($C030 accesses); audio lands in 2b+.
+    // Speaker toggles since power-on ($C030 accesses).
     u64 speakerToggles() const { return speakerToggles_; }
+    Speaker& speaker() { return speaker_; }
+    const Speaker& speaker() const { return speaker_; }
 
     // BusInterface
     u8 read8(u32 addr, AddrSpace sp = AddrSpace::Flat) override;
@@ -110,6 +113,7 @@ private:
     std::array<bool, 4> annunciators_{};
 
     u64 speakerToggles_ = 0;
+    Speaker speaker_{static_cast<double>(kClockHz)};
 };
 
 } // namespace ab

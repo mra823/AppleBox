@@ -41,6 +41,8 @@ int MainWindow::run(int headlessFrames) {
     ImGui_ImplSDL2_InitForOpenGL(window, glContext);
     ImGui_ImplOpenGL3_Init("#version 130");
 
+    openAudio();
+
     bool running = true;
     int frames = 0;
     while (running) {
@@ -57,6 +59,8 @@ int MainWindow::run(int headlessFrames) {
             apple2_->run(Apple2PlusMachine::kClockHz / 60);
         else
             scheduler_.runUntil(scheduler_.now() + 1'000'000);
+
+        pumpAudio();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -78,6 +82,7 @@ int MainWindow::run(int headlessFrames) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
+    closeAudio();
     if (apple2Tex_) glDeleteTextures(1, &apple2Tex_);
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
@@ -96,6 +101,14 @@ void MainWindow::drawUi() {
             ImGui::MenuItem("Demo window", nullptr, &showDemo_);
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Audio")) {
+            ImGui::MenuItem("Mute", nullptr, &muted_);
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::SliderFloat("Volume", &volume_, 0.0f, 1.0f, "%.2f");
+            if (audioDevice_ == 0)
+                ImGui::TextDisabled("(no audio device)");
+            ImGui::EndMenu();
+        }
         ImGui::EndMainMenuBar();
     }
 
@@ -111,6 +124,9 @@ void MainWindow::drawUi() {
         ImGui::Text("Machine: Apple II+ @ 1.02 MHz");
         ImGui::Text("Master clock: %lld ticks",
                     static_cast<long long>(apple2_->scheduler().now()));
+        ImGui::Text("Speaker: %llu toggles%s",
+                    static_cast<unsigned long long>(apple2_->speakerToggles()),
+                    muted_ ? " (muted)" : "");
     } else {
         ImGui::Text("No machine running.");
         ImGui::TextDisabled("Machine > Configure... to select one.");
@@ -306,6 +322,53 @@ void MainWindow::drawDiskUi() {
         ImGui::TextColored(ImVec4(1.f, 0.4f, 0.4f, 1.f), "%s",
                            diskError_.c_str());
     ImGui::End();
+}
+
+void MainWindow::openAudio() {
+    SDL_AudioSpec want{};
+    want.freq = Speaker::kDefaultSampleRate;
+    want.format = AUDIO_F32SYS;
+    want.channels = 1;
+    want.samples = 1024;
+    want.callback = nullptr; // queued audio; no callback thread to lock against
+    SDL_AudioSpec got{};
+    audioDevice_ = SDL_OpenAudioDevice(nullptr, 0, &want, &got, 0);
+    if (audioDevice_ == 0) {
+        std::fprintf(stderr, "audio unavailable: %s\n", SDL_GetError());
+        return;
+    }
+    SDL_PauseAudioDevice(audioDevice_, 0);
+}
+
+void MainWindow::closeAudio() {
+    if (audioDevice_) {
+        SDL_CloseAudioDevice(audioDevice_);
+        audioDevice_ = 0;
+    }
+}
+
+void MainWindow::pumpAudio() {
+    if (!audioDevice_ || !apple2_) return;
+    Speaker& spk = apple2_->speaker();
+    spk.setVolume(volume_);
+    spk.setMuted(muted_);
+
+    // Keep at most ~100 ms queued: more is latency, less risks underruns.
+    const Uint32 maxQueued =
+        sizeof(float) * static_cast<Uint32>(spk.sampleRate() / 10);
+    if (SDL_GetQueuedAudioSize(audioDevice_) > maxQueued) {
+        // The machine is outrunning real time; drop what we just rendered
+        // rather than letting the delay grow without bound.
+        spk.clear();
+        return;
+    }
+
+    float buffer[4096];
+    while (std::size_t n = spk.read(buffer, std::size(buffer))) {
+        SDL_QueueAudio(audioDevice_, buffer,
+                       static_cast<Uint32>(n * sizeof(float)));
+        if (n < std::size(buffer)) break;
+    }
 }
 
 } // namespace ab

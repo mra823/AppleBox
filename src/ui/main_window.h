@@ -27,6 +27,9 @@ private:
     void drawTerminal();
     void drawApple2Screen();
     void drawDiskUi();
+    void openAudio();
+    void closeAudio();
+    void pumpAudio();
 
     Scheduler scheduler_; // idle timeline shown when no machine is running
     MachineConfig machineConfig_;
@@ -42,6 +45,10 @@ private:
     std::string machineError_;
     std::array<char, 512> diskPath_{};
     std::string diskError_;
+
+    unsigned audioDevice_ = 0; // SDL_AudioDeviceID (0 = closed)
+    float volume_ = 0.5f;
+    bool muted_ = false;
 };
 
 } // namespace ab

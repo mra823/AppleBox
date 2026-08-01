@@ -51,6 +51,7 @@ void Apple2PlusMachine::reset() {
     lcPreWrite_ = false;
     disk2_.reset();
     cpu_.reset();
+    speaker_.reset(cpu_.cycles());
 }
 
 void Apple2PlusMachine::run(Ticks cycles) {
@@ -60,6 +61,9 @@ void Apple2PlusMachine::run(Ticks cycles) {
         Ticks consumed = cpu_.run(target - scheduler_.now());
         scheduler_.runUntil(scheduler_.now() + consumed);
     }
+    // Render audio up to the current time so silence is produced even when
+    // nothing touches $C030.
+    speaker_.advanceTo(cpu_.cycles());
 }
 
 void Apple2PlusMachine::typeChar(char c) {
@@ -130,6 +134,7 @@ u8 Apple2PlusMachine::ioAccess(u16 addr, bool isWrite, u8 val) {
             return kbdLatch_;
         case 0xc030: // speaker toggle (any access)
             ++speakerToggles_;
+            speaker_.toggle(cpu_.cycles());
             return 0x00;
         case 0xc050:
             switch (addr & 0x000f) {

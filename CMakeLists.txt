@@ -95,6 +95,7 @@ add_library(applebox_core STATIC
   src/core/rom_manifest.cpp
   src/core/sha256.cpp
   src/core/machine.cpp
+  src/audio/speaker.cpp
   src/devices/pia6821.cpp
   src/devices/disk2.cpp
   src/machines/apple1.cpp
@@ -119,7 +120,7 @@ target_compile_options(applebox PRIVATE -Wall -Wextra)
 # --- Tests ---
 if(APPLEBOX_BUILD_TESTS)
   enable_testing()
-  foreach(t scheduler savestate rom_manifest apple1 apple2plus apple2_video disk_image disk2 dos33 language_card harte_6502 klaus_6502)
+  foreach(t scheduler savestate rom_manifest apple1 apple2plus apple2_video disk_image disk2 dos33 language_card speaker harte_6502 klaus_6502)
     add_executable(test_${t} tests/test_${t}.cpp)
     target_link_libraries(test_${t} PRIVATE applebox_core)
     add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -4,10 +4,13 @@
 // disk in the drive, checks the machine does what real hardware does: spin the
 // drive and wait, never reaching BASIC. Skips (77) when the ROM is absent.
 // SPDX-License-Identifier: MIT
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "machines/apple2plus.h"
 
@@ -29,6 +32,42 @@ bool hasPromptLine(ab::Apple2PlusMachine& m) {
 
 void dumpScreen(ab::Apple2PlusMachine& m) {
     for (const auto& line : m.textScreen()) std::printf("|%s|\n", line.c_str());
+}
+
+// Measures the tone the machine produced: its length between the first and
+// last polarity change, and its frequency from the crossing count. The
+// region after the final toggle is the DC blocker decaying, not sound, so it
+// is excluded from the timing.
+struct Tone {
+    double ms = 0.0;
+    double hz = 0.0;
+    double peak = 0.0;
+};
+
+Tone measureTone(const std::vector<float>& v, double sampleRate) {
+    int crossings = 0, state = 0;
+    std::size_t firstX = 0, lastX = 0;
+    Tone t;
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        const int prev = state;
+        if (v[i] > 0.05f && state <= 0) {
+            if (state) ++crossings;
+            state = 1;
+        } else if (v[i] < -0.05f && state >= 0) {
+            if (state) ++crossings;
+            state = -1;
+        }
+        if (state != prev && prev != 0) {
+            if (firstX == 0) firstX = i;
+            lastX = i;
+        }
+        t.peak = std::max<double>(t.peak, std::fabs(v[i]));
+    }
+    if (lastX <= firstX) return t;
+    const double secs = (lastX - firstX) / sampleRate;
+    t.ms = secs * 1000.0;
+    t.hz = crossings / 2.0 / secs;
+    return t;
 }
 
 } // namespace
@@ -86,6 +125,46 @@ int main(int argc, char** argv) {
         std::printf("PASS Disk II with no disk spins and waits in the boot ROM\n");
     } else {
         std::printf("SKIP disk-II-present case: roms/apple2plus/disk2.rom absent\n");
+    }
+
+    // --- Speaker: the monitor's BELL routine at cold start -----------------
+    // BELL toggles $C030 exactly 192 times (LDY #$C0) around a WAIT delay,
+    // giving roughly 1 kHz for a tenth of a second. Checking the rendered
+    // waveform covers the whole chain: ROM timing, the softswitch, and the
+    // speaker's resampling.
+    {
+        ab::Apple2PlusMachine s;
+        if (!s.loadRoms(romRoot)) return 1;
+        s.disk2().removeCard();
+        s.speaker().setVolume(1.0f);
+        s.reset();
+
+        std::vector<float> audio;
+        for (int i = 0; i < 180; ++i) { // 3 s in frame-sized slices
+            s.run(ab::Apple2PlusMachine::kClockHz / 60);
+            std::vector<float> buf(s.speaker().available());
+            if (!buf.empty()) {
+                buf.resize(s.speaker().read(buf.data(), buf.size()));
+                audio.insert(audio.end(), buf.begin(), buf.end());
+            }
+        }
+
+        const Tone t = measureTone(audio, s.speaker().sampleRate());
+        if (s.speakerToggles() != 192) {
+            std::printf("FAIL: BELL made %llu speaker toggles, want 192\n",
+                        static_cast<unsigned long long>(s.speakerToggles()));
+            return 1;
+        }
+        if (t.hz < 850.0 || t.hz > 1050.0 || t.ms < 80.0 || t.ms > 120.0 ||
+            t.peak < 0.5) {
+            std::printf("FAIL: bell tone %.0f Hz for %.1f ms peak %.2f; want "
+                        "~1 kHz for ~100 ms\n",
+                        t.hz, t.ms, t.peak);
+            return 1;
+        }
+        std::printf("PASS speaker bell (%.0f Hz, %.1f ms, peak %.2f, 192 "
+                    "toggles)\n",
+                    t.hz, t.ms, t.peak);
     }
     return 0;
 }
