@@ -31,7 +31,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: tests/data
-          key: cpu-test-data-6502-v1
+          # Bump this whenever fetch_test_data.sh gains a data set, otherwise
+          # the old cache is restored, the new set is downloaded on every run,
+          # and it is never saved back (the key already exists).
+          key: cpu-test-data-65x02-v2
       - name: Fetch CPU test data
         run: ./scripts/fetch_test_data.sh
       - name: Test
